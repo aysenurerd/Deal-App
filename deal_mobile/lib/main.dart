@@ -266,21 +266,20 @@ class _MovieScreenState extends State<MovieScreen> {
     );
   }
 
+// --- GÜNCELLENMİŞ KART TASARIMI ---
   Widget _buildMovieCard(BuildContext context, Map<String, dynamic> movie) {
-    // --- GESTURE DETECTOR: YUKARI KAYDIRMAYI BURASI ALGILAR ---
     return GestureDetector(
       onVerticalDragEnd: (details) {
-        // Eğer parmak yukarı doğru hızlıca gittiyse (-velocity)
         if (details.primaryVelocity! < -500) {
           _showMovieDetails(context, movie);
         }
       },
-      onTap: () => _showMovieDetails(context, movie), // Tıklayınca da açsın
+      onTap: () => _showMovieDetails(context, movie),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(30),
         child: Stack(
           children: [
-            // Afiş
+            // 1. Film Afişi
             Positioned.fill(
               child: Image.network(
                 movie['poster_url'] ?? '',
@@ -289,39 +288,70 @@ class _MovieScreenState extends State<MovieScreen> {
               ),
             ),
             
-            // Alt Bilgi Alanı (Gradient)
+            // 2. Alt Bilgi Alanı (Daha Koyu ve Okunaklı)
             Positioned(
               bottom: 0,
               left: 0,
               right: 0,
               child: Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(24), // Biraz daha geniş alan
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
-                    colors: [Colors.black.withOpacity(0.9), Colors.transparent],
-                    stops: const [0.5, 1.0],
+                    colors: [Colors.black.withOpacity(0.95), Colors.transparent],
+                    stops: const [0.6, 1.0],
                   ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(movie['title'], style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white)),
-                    const SizedBox(height: 5),
+                    // İSİM
+                    Text(
+                      movie['title'], 
+                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white, height: 1.1),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+
+                    // DETAY SATIRI: Yıl • Puan • Süre (Artık "Film" yazısı yok)
                     Row(
                       children: [
+                        Text(movie['release_date']?.toString().substring(0, 4) ?? "2024", style: const TextStyle(color: Colors.white70)),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.circle, size: 4, color: Colors.grey),
+                        const SizedBox(width: 8),
                         const Icon(Icons.star, color: Colors.amber, size: 16),
-                        const SizedBox(width: 5),
-                        Text(movie['imdb_rating'] ?? "7.5", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                        const SizedBox(width: 15),
-                        Text(movie['genre'] ?? "Film", style: const TextStyle(color: Colors.white70)),
+                        const SizedBox(width: 4),
+                        Text(movie['imdb_rating'] ?? "7.0", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.circle, size: 4, color: Colors.grey),
+                        const SizedBox(width: 8),
+                        // Süre verisi şimdilik backend'den gelmediği için statik, gelince 'runtime' yazarız
+                        const Text("1s 45dk", style: TextStyle(color: Colors.white70)), 
                       ],
                     ),
+                    const SizedBox(height: 12),
+
+                    // TÜRLER (Hepsini Yan Yana Gösterelim)
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildGenreTag(movie['genre'] ?? "Genel"),
+                          const SizedBox(width: 6),
+                          // Veritabanında tek satırda "Aksiyon, Dram" yazıyorsa onu parçalayabiliriz
+                          // Şimdilik görsel zenginlik için statik örnek ekliyorum, backend geliştikçe burası da canlanır
+                          if ((movie['genre'] ?? "").length < 10) _buildGenreTag("Macera"), 
+                        ],
+                      ),
+                    ),
+                    
                     const SizedBox(height: 10),
-                    // Yukarı Kaydır İpucu Oku
-                    const Center(child: Icon(Icons.keyboard_arrow_up, color: Colors.white54, size: 30)),
+                    // Yukarı Kaydır İkonu (Animasyon hissi için)
+                    Center(child: Icon(Icons.keyboard_arrow_up, color: Colors.white.withOpacity(0.5), size: 24)),
                   ],
                 ),
               ),
@@ -329,6 +359,19 @@ class _MovieScreenState extends State<MovieScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  // Tür kutucukları için yardımcı tasarım
+  Widget _buildGenreTag(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15), // Hafif şeffaf
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 11)),
     );
   }
 
