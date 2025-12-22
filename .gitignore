@@ -1,0 +1,15 @@
+# Python sanal ortamları
+venv/
+.env
+
+# Flutter ve Dart çıktıları
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+
+# IDE ayarları
+.vscode/
+.idea/
+*.iml
+deal_model/
