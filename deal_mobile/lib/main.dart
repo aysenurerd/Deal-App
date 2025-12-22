@@ -1,6 +1,9 @@
-import 'dart:ui'; // Buzlu cam efekti (Blur) için gerekli
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'services/api_service.dart';
+import 'package:flutter_card_swiper/flutter_card_swiper.dart';
+import 'package:confetti/confetti.dart';
+import 'package:url_launcher/url_launcher.dart'; // Fragman linkini açmak için (pubspec.yaml'a ekle: url_launcher)
 
 void main() => runApp(const DealApp());
 
@@ -12,6 +15,7 @@ class DealApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
+        fontFamily: 'Roboto', // Varsa özel fontun buraya ekle
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple, brightness: Brightness.dark),
       ),
       home: const MovieScreen(),
@@ -27,181 +31,318 @@ class MovieScreen extends StatefulWidget {
 
 class _MovieScreenState extends State<MovieScreen> {
   final ApiService _apiService = ApiService();
-  Map<String, dynamic>? _currentMovie;
-  bool _isLoading = false;
+  final CardSwiperController _swiperController = CardSwiperController();
+  late ConfettiController _confettiController;
+  
+  List<Map<String, dynamic>> _movies = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadNewMovie();
+    _confettiController = ConfettiController(duration: const Duration(seconds: 1));
+    _startSession();
   }
 
-  Future<void> _loadNewMovie() async {
-    setState(() {
-      _isLoading = true;
-      _currentMovie = null; 
-    });
-    
+  @override
+  void dispose() {
+    _confettiController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _startSession() async {
+    setState(() => _isLoading = true);
+    // Başlangıç için 5 film çekelim
+    for (int i = 0; i < 5; i++) {
+      await _loadMoreMovies();
+    }
+    setState(() => _isLoading = false);
+  }
+
+  Future<void> _loadMoreMovies() async {
     try {
       final movie = await _apiService.fetchRandomMovie();
-      setState(() {
-        _currentMovie = movie;
-        _isLoading = false;
-      });
+      if (movie != null) {
+        // Fragman linki yoksa, YouTube arama linki oluştur
+        movie['trailer_url'] = "https://www.youtube.com/results?search_query=${movie['title']}+trailer";
+        setState(() {
+          _movies.add(movie);
+        });
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
-      print("❌ BAĞLANTI HATASI: $e"); 
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text("Bağlantı Sorunu"),
-          content: Text("Sunucuya ulaşılamadı. IP adresini veya Python terminalini kontrol et: $e"),
-          actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("Tamam"))],
-        ),
-      );
+      print("Film yükleme hatası: $e");
     }
+  }
+
+  // --- KRİTİK NOKTA: DETAY PANELİNİ AÇAN FONKSİYON ---
+  void _showMovieDetails(BuildContext context, Map<String, dynamic> movie) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, // Tam ekran boyuna yakın açılmasını sağlar
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6, // Ekranın %60'ı kadar açılsın
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        builder: (_, controller) => Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E1E1E), // Dune tarzı koyu gri arka plan
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20)],
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: ListView(
+            controller: controller,
+            children: [
+              // Tutamaç Çubuğu (Gri Çizgi)
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 15),
+                  height: 5,
+                  width: 50,
+                  decoration: BoxDecoration(color: Colors.grey[700], borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+
+              // Başlık
+              Text(movie['title'], style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
+              const SizedBox(height: 10),
+
+              // Bilgi Satırı (Yıl • Puan • Süre)
+              Row(
+                children: [
+                  Text("2024", style: TextStyle(color: Colors.grey[400])), // Yıl verisi varsa buraya ekle
+                  const SizedBox(width: 10),
+                  const Icon(Icons.circle, size: 5, color: Colors.grey),
+                  const SizedBox(width: 10),
+                  const Icon(Icons.star, color: Colors.amber, size: 18),
+                  const SizedBox(width: 5),
+                  Text(movie['imdb_rating'] ?? "8.1", style: TextStyle(color: Colors.green[400], fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 10),
+                  const Icon(Icons.circle, size: 5, color: Colors.grey),
+                  const SizedBox(width: 10),
+                  Text("2s 46dk", style: TextStyle(color: Colors.grey[400])), // Süre verisi varsa buraya
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Türler (Chips)
+              Wrap(
+                spacing: 10,
+                children: [
+                  _buildGenreChip(movie['genre'] ?? "Bilim Kurgu"),
+                  _buildGenreChip("Macera"), // Örnek
+                  _buildGenreChip("Dram"),   // Örnek
+                ],
+              ),
+              const SizedBox(height: 25),
+
+              // "Synopsis" (Özet) Başlığı
+              const Text("Özet", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+              const SizedBox(height: 10),
+              Text(
+                movie['overview'] ?? "Bu filmin özeti bulunmuyor.",
+                style: const TextStyle(color: Colors.grey, height: 1.5, fontSize: 15),
+              ),
+              const SizedBox(height: 30),
+
+              // Fragman Butonu (YouTube)
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red[800],
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  ),
+                  onPressed: () async {
+                    final Uri url = Uri.parse(movie['trailer_url']);
+                    if (!await launchUrl(url)) {
+                      print("Link açılamadı: $url");
+                    }
+                  },
+                  icon: const Icon(Icons.play_circle_fill, color: Colors.white),
+                  label: const Text("Fragmanı İzle", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(height: 50), // Alt boşluk
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGenreChip(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator()) 
-        : _currentMovie == null 
-          ? const Center(child: Text("Yükleniyor..."))
-          : Stack(
+      body: Stack(
+        children: [
+          // Arka Plan
+          if (_movies.isNotEmpty)
+            Positioned.fill(
+              child: Image.network(
+                _movies.first['poster_url'] ?? '',
+                fit: BoxFit.cover,
+                errorBuilder: (c, e, s) => Container(color: Colors.black),
+              ),
+            ),
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30), // Daha güçlü blur
+              child: Container(color: Colors.black.withOpacity(0.7)),
+            ),
+          ),
+
+          SafeArea(
+            child: Column(
               children: [
-                // 1. KATMAN: Arka Plan Afişi ve Blur (Buzlu Cam Hazırlığı)
-                Positioned.fill(
-                  child: Image.network(
-                    _currentMovie!['poster_url'] ?? '',
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(color: Colors.black),
-                  ),
+                const Padding(
+                  padding: EdgeInsets.only(top: 10, bottom: 5),
+                  child: Text("DEAL", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 4, color: Colors.white)),
                 ),
-                Positioned.fill(
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                    child: Container(color: Colors.black.withOpacity(0.5)),
-                  ),
+                
+                Expanded(
+                  child: _isLoading && _movies.isEmpty
+                      ? const Center(child: CircularProgressIndicator())
+                      : CardSwiper(
+                          controller: _swiperController,
+                          cardsCount: _movies.length,
+                          numberOfCardsDisplayed: 3,
+                          // --- ÖNEMLİ: KARTI SADECE YATAY KAYDIRMAYA İZİN VER ---
+                          // Böylece yukarı çektiğinde kart gitmez, detay açılır.
+                          allowedSwipeDirection: const AllowedSwipeDirection.only(left: true, right: true), 
+                          onSwipe: (previousIndex, currentIndex, direction) {
+                            if (direction == CardSwiperDirection.right) _confettiController.play();
+                            if (currentIndex != null && currentIndex >= _movies.length - 2) _loadMoreMovies();
+                            return true;
+                          },
+                          padding: const EdgeInsets.all(24.0),
+                          cardBuilder: (context, index, horizontalOffsetPercentage, verticalOffsetPercentage) {
+                            return _buildMovieCard(context, _movies[index]);
+                          },
+                        ),
                 ),
-
-                // 2. KATMAN: İçerik
-                SafeArea(
-                  child: Column(
+                
+                // Alt Butonlar
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 20),
-                        child: Text("DEAL - AI MATCH", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 4, color: Colors.white70)),
-                      ),
-
-                      // ANA KART (Görsel ve Hata Kontrolü)
-                      Expanded(
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(30),
-                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 25, spreadRadius: 5)],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(30),
-                            child: Image.network(
-                              _currentMovie!['poster_url'] ?? '',
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                              // --- HATA KONTROLÜ ---
-                              errorBuilder: (context, error, stackTrace) => Container(
-                                color: Colors.grey[900],
-                                child: const Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.broken_image, size: 80, color: Colors.white24),
-                                    SizedBox(height: 10),
-                                    Text("Afiş Yüklenemedi\n(URL veya İnternet Hatası)", textAlign: TextAlign.center, style: TextStyle(color: Colors.white24)),
-                                  ],
-                                ),
-                              ),
-                              // ---------------------
-                              loadingBuilder: (context, child, loadingProgress) {
-                                if (loadingProgress == null) return child;
-                                return const Center(child: CircularProgressIndicator());
-                              },
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // BİLGİ PANELİ (Glassmorphism Tasarımı)
-                      Container(
-                        padding: const EdgeInsets.all(25),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
-                          borderRadius: const BorderRadius.only(topLeft: Radius.circular(40), topRight: Radius.circular(40)),
-                          border: Border.all(color: Colors.white.withOpacity(0.1)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(child: Text(_currentMovie!['title'], style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white))),
-                                Text(_currentMovie!['release_date'] ?? "2025", style: const TextStyle(color: Colors.white54)),
-                              ],
-                            ),
-                            const SizedBox(height: 15),
-                            
-                            // BERT AI Yorum Kutusu
-                            Container(
-                              padding: const EdgeInsets.all(15),
-                              decoration: BoxDecoration(
-                                color: _currentMovie!['ai_result'] == "Pozitif" ? Colors.green.withOpacity(0.15) : Colors.red.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: _currentMovie!['ai_result'] == "Pozitif" ? Colors.green.withOpacity(0.5) : Colors.red.withOpacity(0.5)),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.auto_awesome, color: _currentMovie!['ai_result'] == "Pozitif" ? Colors.greenAccent : Colors.redAccent, size: 20),
-                                  const SizedBox(width: 10),
-                                  Expanded(child: Text(_currentMovie!['ai_comment'] ?? "Analiz yapılıyor...", style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Colors.white))),
-                                ],
-                              ),
-                            ),
-
-                            const SizedBox(height: 25),
-                            
-                            // Kontrol Butonları
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                _buildActionButton(Icons.close, Colors.red, _loadNewMovie),
-                                _buildActionButton(Icons.favorite, Colors.green, _loadNewMovie),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
+                      _buildCircleButton(Icons.close, Colors.red, () => _swiperController.swipe(CardSwiperDirection.left)),
+                      _buildCircleButton(Icons.favorite, Colors.green, () => _swiperController.swipe(CardSwiperDirection.right)),
                     ],
                   ),
                 ),
               ],
             ),
+          ),
+          
+          Align(
+            alignment: Alignment.topCenter,
+            child: ConfettiWidget(
+              confettiController: _confettiController,
+              blastDirectionality: BlastDirectionality.explosive,
+              shouldLoop: false,
+              colors: const [Colors.green, Colors.blue, Colors.pink],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  // Şık Buton Tasarımı İçin Yardımcı Fonksiyon
-  Widget _buildActionButton(IconData icon, Color color, VoidCallback onPressed) {
+  Widget _buildMovieCard(BuildContext context, Map<String, dynamic> movie) {
+    // --- GESTURE DETECTOR: YUKARI KAYDIRMAYI BURASI ALGILAR ---
+    return GestureDetector(
+      onVerticalDragEnd: (details) {
+        // Eğer parmak yukarı doğru hızlıca gittiyse (-velocity)
+        if (details.primaryVelocity! < -500) {
+          _showMovieDetails(context, movie);
+        }
+      },
+      onTap: () => _showMovieDetails(context, movie), // Tıklayınca da açsın
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(30),
+        child: Stack(
+          children: [
+            // Afiş
+            Positioned.fill(
+              child: Image.network(
+                movie['poster_url'] ?? '',
+                fit: BoxFit.cover,
+                errorBuilder: (c, e, s) => Container(color: Colors.grey[900], child: const Icon(Icons.movie, size: 50, color: Colors.white24)),
+              ),
+            ),
+            
+            // Alt Bilgi Alanı (Gradient)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [Colors.black.withOpacity(0.9), Colors.transparent],
+                    stops: const [0.5, 1.0],
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(movie['title'], style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white)),
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        const Icon(Icons.star, color: Colors.amber, size: 16),
+                        const SizedBox(width: 5),
+                        Text(movie['imdb_rating'] ?? "7.5", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 15),
+                        Text(movie['genre'] ?? "Film", style: const TextStyle(color: Colors.white70)),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    // Yukarı Kaydır İpucu Oku
+                    const Center(child: Icon(Icons.keyboard_arrow_up, color: Colors.white54, size: 30)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCircleButton(IconData icon, Color color, VoidCallback onPressed) {
     return GestureDetector(
       onTap: onPressed,
       child: Container(
-        padding: const EdgeInsets.all(15),
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: color.withOpacity(0.15),
-          border: Border.all(color: color.withOpacity(0.5), width: 2),
+          color: Colors.black54,
+          border: Border.all(color: color, width: 2),
         ),
-        child: Icon(icon, color: color, size: 35),
+        child: Icon(icon, color: color, size: 32),
       ),
     );
   }
