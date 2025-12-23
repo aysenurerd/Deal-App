@@ -4,7 +4,6 @@ import mysql.connector
 app = Flask(__name__)
 
 # --- VERİTABANI AYARLARI ---
-# Şifreni buraya doğru yazdığından emin ol ('123456' olarak bıraktım senin kodundan)
 DB_CONFIG = {
     'host': 'localhost',
     'user': 'root',
@@ -26,9 +25,11 @@ def get_filtered_movie():
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
 
-        # --- SQL SORGUSU ---
+        # --- SQL SORGUSU (GÜNCELLENDİ) ---
+        # g.name as genre_name diyerek türün ismini de çekiyoruz
         query = """
-            SELECT DISTINCT m.* FROM movies m
+            SELECT DISTINCT m.*, g.name as genre_name 
+            FROM movies m
             JOIN movie_genres mg ON m.id = mg.movie_id
             JOIN genres g ON mg.genre_id = g.id
             WHERE 1=1
@@ -53,35 +54,34 @@ def get_filtered_movie():
         cursor.execute(query, tuple(params))
         movie = cursor.fetchone()
         
-        # Bağlantıyı burada tek seferde kapatıyoruz
         conn.close()
 
         if movie:
             # --- AKILLI URL DÜZELTİCİ ---
             raw_path = movie.get('poster_url')
             
-            # 1. Eğer veri hiç yoksa
             if not raw_path:
                 full_poster_url = "https://via.placeholder.com/500x750?text=Afis+Yok"
-            
-            # 2. Eğer veri zaten "http" ile başlıyorsa (Tam link ise dokunma)
             elif str(raw_path).startswith('http'):
                 full_poster_url = raw_path
-            
-            # 3. Eğer veri sadece "/abc.jpg" şeklindeyse (Yarım ise tamamla)
             else:
                 clean_path = raw_path if str(raw_path).startswith('/') else f"/{raw_path}"
                 full_poster_url = f"https://image.tmdb.org/t/p/w500{clean_path}"
+
+            # --- PUAN FORMATLAMA ---
+            # Puan float geliyor (7.8), bunu string yapıyoruz. Yoksa '0.0' olsun.
+            rating = movie.get('vote_average')
+            final_rating = str(rating) if rating is not None else "0.0"
 
             return jsonify({
                 "id": movie['id'],
                 "title": movie['title'],
                 "overview": movie.get('overview', ''),
-                "poster_url": full_poster_url,  # <-- Garantili link
+                "poster_url": full_poster_url,
                 "release_date": movie.get('release_date'),
-                "imdb_rating": str(movie.get('vote_average', '0.0')),
+                "imdb_rating": final_rating,  # <-- Veritabanındaki gerçek puan
                 "platform": movie.get('platform', 'Sinema'),
-                "genre": movie.get('genres', 'Genel')
+                "genre": movie.get('genre_name', 'Genel') # <-- Artık gerçek tür ismi geliyor
             })
         else:
             return jsonify({"error": "Aradığın kriterlere uygun film bulunamadı."}), 404
