@@ -101,8 +101,8 @@ class ApiService {
         queryParams['genres'] = genres.join(',');
       }
       if (years != null) {
-        queryParams['year_min'] = years.start.round().toString();
-        queryParams['year_max'] = years.end.round().toString();
+        queryParams['min_year'] = years.start.round().toString();
+        queryParams['max_year'] = years.end.round().toString();
       }
       if (platforms != null && platforms.isNotEmpty) {
         queryParams['platforms'] = platforms.join(',');
