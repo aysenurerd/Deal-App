@@ -63,7 +63,7 @@ def get_partners():
         return jsonify(partners)
     except Exception as e: return jsonify({"error": str(e)}), 500
 
-# --- 3. OYUN İÇİN FİLM ÇEKME (DÜZELTİLDİ: Senin Tablo Yapına Göre) ---
+# --- 3. OYUN İÇİN FİLM ÇEKME (FİNAL DÜZELTME: Having Kaldırıldı) ---
 @app.route('/get-game-movies', methods=['GET'])
 def get_game_movies():
     try:
@@ -75,7 +75,7 @@ def get_game_movies():
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
 
-        # Temel Sorgu: Artık platform tablosuna JOIN YOK. Direkt m.platform alıyoruz.
+        # Temel Sorgu: Filmleri çek, türleri varsa ekle, yoksa NULL kalsın
         query = """
             SELECT m.id, m.title, m.poster_url, m.vote_average, m.release_date, m.overview, m.platform,
                    GROUP_CONCAT(DISTINCT g.name SEPARATOR ', ') as genre_names
@@ -92,7 +92,7 @@ def get_game_movies():
             conditions.append("YEAR(m.release_date) BETWEEN %s AND %s")
             params.extend([min_year, max_year])
 
-        # Tür Filtresi
+        # Tür Filtresi (Varsa uygula)
         if genres_str:
             genre_list = genres_str.split(',')
             placeholders = ','.join(['%s'] * len(genre_list))
@@ -100,59 +100,89 @@ def get_game_movies():
             conditions.append(f"m.id IN ({subquery})")
             params.extend(genre_list)
         
-        # Platform Filtresi (Artık m.platform sütununda arama yapıyoruz)
+        # Platform Filtresi (Sinema + NULL Desteği)
         if platforms_str:
-            platform_list = platforms_str.split(',')
-            # LIKE kullanarak esnek arama yapalım (Örn: 'Netflix' içerenleri bul)
+            platform_list = [p.strip() for p in platforms_str.split(',')]
             platform_conditions = []
+            
+            is_cinema_selected = any(p.lower() == 'sinema' for p in platform_list)
+            
+            if is_cinema_selected:
+                # Sinema seçildiyse: NULL, Boşluk veya 'Sinema' içerenleri al
+                platform_conditions.append("(m.platform IS NULL OR m.platform = '' OR m.platform LIKE '%Sinema%')")
+                platform_list = [p for p in platform_list if p.lower() != 'sinema']
+            
             for p in platform_list:
-                platform_conditions.append("m.platform LIKE %s")
-                params.append(f"%{p}%")
+                if p:
+                    platform_conditions.append("m.platform LIKE %s")
+                    params.append(f"%{p}%")
             
             if platform_conditions:
                 conditions.append(f"({' OR '.join(platform_conditions)})")
 
-        # Koşulları Ekle
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
 
-        # Grupla ve Rastgele Getir
-        query += " GROUP BY m.id HAVING genre_names IS NOT NULL ORDER BY RAND() LIMIT 10"
+        # DEBUG: Log bas
+        print(f"DEBUG: İstek Geldi -> Platform: {platforms_str} | Tür: {genres_str}")
+
+        # --- KRİTİK DEĞİŞİKLİK ---
+        # "HAVING genre_names IS NOT NULL" KISMINI SİLDİK!
+        # Artık türü olmayan "yetim" filmler de listeye girebilecek.
+        # Limit 50 ile geniş bir havuz alıp Python'da karıştıracağız.
+        query += " GROUP BY m.id ORDER BY RAND() LIMIT 50"
 
         cursor.execute(query, tuple(params))
         movies = cursor.fetchall()
+        
+        print(f"DEBUG: SQL'den Dönen Film Sayısı: {len(movies)}")
 
-        # Veriyi İşle
+        # Python Shuffle: İyice karıştır
+        random.shuffle(movies)
+
+        # İlk 5 tanesini seç
+        selected_movies = movies[:5]
+        
+        # Seçilenlerin ID'lerini logla (Kontrol için)
+        if selected_movies:
+             print(f"DEBUG: Seçilen ID'ler: {[m['id'] for m in selected_movies]}")
+
+        # Veriyi Temizle
         cleaned_movies = []
-        for m in movies:
+        for m in selected_movies:
             poster = m.get('poster_url', '')
             if poster and not poster.startswith('http'):
                 poster = f"https://image.tmdb.org/t/p/w500{poster}"
 
             year = ""
-            release_date = m.get('release_date')
-            if release_date:
-                try: year = release_date.year
-                except: year = str(release_date)[:4]
+            if m.get('release_date'):
+                try: year = str(m['release_date'].year)
+                except: year = str(m['release_date'])[:4]
 
-            # Platform verisi artık direkt tablodan geliyor
             platform_info = m.get('platform')
-            if not platform_info:
-                platform_info = "Sinema" # Boşsa varsayılan
+            if not platform_info: 
+                platform_info = "Sinema"
 
             cleaned_movies.append({
                 "id": m['id'],
                 "title": m.get('title', 'Başlıksız'),
                 "poster_url": poster,
                 "rating": str(m.get('vote_average', 0.0)),
-                "year": str(year),
-                "genres": m.get('genre_names', ''),
-                "platforms": platform_info,  # Flutter burayı okuyacak
+                "year": year,
+                "genres": m.get('genre_names', ''), # Tür yoksa boş gelsin, sorun değil
+                "platforms": platform_info,
                 "overview": m.get('overview', 'Özet bulunamadı.')
             })
 
         conn.close()
-        return jsonify(cleaned_movies)
+        
+        # Cache (Önbellek) Engelleme Başlıkları
+        response = jsonify(cleaned_movies)
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        
+        return response
 
     except Exception as e:
         print("HATA:", str(e))

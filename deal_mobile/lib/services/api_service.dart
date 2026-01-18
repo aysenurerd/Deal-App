@@ -97,6 +97,10 @@ class ApiService {
       final uri = Uri.parse('$baseUrl/get-game-movies');
       final queryParams = <String, String>{};
       
+      // HTTP caching'i engellemek için timestamp parametresi ekle
+      final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      queryParams['timestamp'] = timestamp;
+      
       if (genres != null && genres.isNotEmpty) {
         queryParams['genres'] = genres.join(',');
       }
@@ -108,9 +112,7 @@ class ApiService {
         queryParams['platforms'] = platforms.join(',');
       }
       
-      final url = queryParams.isEmpty 
-          ? uri 
-          : uri.replace(queryParameters: queryParams);
+      final url = uri.replace(queryParameters: queryParams);
       
       final response = await http.get(url);
 

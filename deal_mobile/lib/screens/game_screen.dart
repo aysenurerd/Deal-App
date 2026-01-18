@@ -957,16 +957,52 @@ class _GameScreenState extends State<GameScreen> {
                     ),
                   )),
             const SizedBox(height: 40),
+            
+            // DEVAM ET butonu (Yeni 5 Film)
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _stage = GameStage.loading;
+                    _swiperKey = UniqueKey();
+                    _currentCardIndex = 0;
+                  });
+                  _loadMovies();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: Text(
+                  'DEVAM ET (YENİ 5 FİLM)',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // ANA SAYFAYA DÖN butonu
             SizedBox(
               width: double.infinity,
               height: 56,
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(context),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.black,
+                  backgroundColor: AppColors.surfaceDark,
+                  foregroundColor: AppColors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
+                    side: const BorderSide(color: AppColors.primary, width: 2),
                   ),
                 ),
                 child: Text(
