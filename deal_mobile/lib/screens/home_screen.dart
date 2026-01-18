@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../utils/colors.dart';
 import '../services/user_session.dart';
 import '../services/api_service.dart';
+import 'filter_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final Function(int)? onTabChange;
@@ -27,22 +28,25 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _handleStartPlaying(int index) {
     if (index == 0) {
-      // Solo Mode - GameScreen'e yönlendir
-      _navigateToGameScreen(isSolo: true);
+      // Solo Mode - FilterScreen'e yönlendir
+      _navigateToFilterScreen(isSolo: true);
     } else {
       // Partner Mode - Partner dialog aç
       _showPartnerDialog();
     }
   }
 
-  void _navigateToGameScreen({required bool isSolo, int? partnerId}) {
-    print("GameScreen'e yönlendiriliyor - isSolo: $isSolo, partnerId: $partnerId");
-    // Navigator.push(
-    //   context,
-    //   MaterialPageRoute(
-    //     builder: (context) => GameScreen(isSolo: isSolo, partnerId: partnerId),
-    //   ),
-    // );
+  void _navigateToFilterScreen({required bool isSolo, int? partnerId, String? partnerName}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FilterScreen(
+          isSolo: isSolo,
+          partnerId: partnerId,
+          partnerName: partnerName,
+        ),
+      ),
+    );
   }
 
   Future<void> _showPartnerDialog() async {
@@ -59,9 +63,13 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (context) => _PartnerDialog(
         partners: partners,
-        onPartnerSelected: (partnerId) {
+        onPartnerSelected: (partnerId, partnerName) {
           Navigator.pop(context);
-          _navigateToGameScreen(isSolo: false, partnerId: partnerId);
+          _navigateToFilterScreen(
+            isSolo: false,
+            partnerId: partnerId,
+            partnerName: partnerName,
+          );
         },
         onAddPartner: () async {
           Navigator.pop(context);
@@ -501,7 +509,7 @@ class _HomeScreenState extends State<HomeScreen> {
 // Partner Dialog Widget
 class _PartnerDialog extends StatelessWidget {
   final List<Map<String, dynamic>> partners;
-  final Function(int) onPartnerSelected;
+  final Function(int, String) onPartnerSelected;
   final VoidCallback onAddPartner;
 
   const _PartnerDialog({
@@ -546,7 +554,10 @@ class _PartnerDialog extends StatelessWidget {
               ...partners.map((partner) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: InkWell(
-                      onTap: () => onPartnerSelected(partner['id'] as int),
+                      onTap: () => onPartnerSelected(
+                        partner['id'] as int,
+                        partner['name'] as String? ?? 'Partner',
+                      ),
                       child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(

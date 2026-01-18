@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 class ApiService {
@@ -86,7 +87,77 @@ class ApiService {
     }
   }
 
-  // 3. FİLTRELİ FİLM GETİR (Yeni Yıldızımız)
+  // 3. OYUN İÇİN FİLM LİSTESİ GETİR
+  Future<List<Map<String, dynamic>>> getGameMovies({
+    List<String>? genres,
+    RangeValues? years,
+    List<String>? platforms,
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl/get-game-movies');
+      final queryParams = <String, String>{};
+      
+      if (genres != null && genres.isNotEmpty) {
+        queryParams['genres'] = genres.join(',');
+      }
+      if (years != null) {
+        queryParams['year_min'] = years.start.round().toString();
+        queryParams['year_max'] = years.end.round().toString();
+      }
+      if (platforms != null && platforms.isNotEmpty) {
+        queryParams['platforms'] = platforms.join(',');
+      }
+      
+      final url = queryParams.isEmpty 
+          ? uri 
+          : uri.replace(queryParameters: queryParams);
+      
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is List) {
+          return List<Map<String, dynamic>>.from(data);
+        }
+        return [];
+      } else {
+        print("❌ Film Listesi Hatası: ${response.statusCode} - ${response.body}");
+        return [];
+      }
+    } catch (e) {
+      print("❌ Bağlantı Hatası: $e");
+      return [];
+    }
+  }
+
+  // 4. EŞLEŞME KAYDET
+  Future<bool> saveMatch(int userId, int movieId, {int? partnerId}) async {
+    try {
+      final url = Uri.parse('$baseUrl/save-match');
+      
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "user_id": userId,
+          "movie_id": movieId,
+          "partner_id": partnerId,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        print("❌ Eşleşme Kaydetme Hatası: ${response.statusCode} - ${response.body}");
+        return false;
+      }
+    } catch (e) {
+      print("❌ Bağlantı Hatası: $e");
+      return false;
+    }
+  }
+
+  // 5. FİLTRELİ FİLM GETİR (Yeni Yıldızımız)
   // Python'daki '/get-filtered-movie' adresine gidiyor.
   Future<Map<String, dynamic>?> fetchFilteredMovie({String? platform, String? genre}) async {
     try {
