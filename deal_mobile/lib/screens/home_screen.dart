@@ -4,6 +4,7 @@ import '../utils/colors.dart';
 import '../services/user_session.dart';
 import '../services/api_service.dart';
 import 'filter_screen.dart';
+import 'lists_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final Function(int)? onTabChange;
@@ -249,6 +250,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 40),
 
               // Hızlı Erişim / Kütüphanem
+// Hızlı Erişim / Kütüphanem
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20.0),
                 child: Text(
@@ -256,14 +258,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: GoogleFonts.poppins(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.white,
+                    color: Colors.white,
                   ),
                 ),
               ),
 
               const SizedBox(height: 16),
 
-              // List Items - 2 sabit kart
+              // --- TAMİR EDİLEN BÖLGE BURASI ---
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20.0),
                 child: Column(
@@ -272,7 +274,18 @@ class _HomeScreenState extends State<HomeScreen> {
                       title: 'İlgilendiklerim',
                       subtitle: 'Kişisel listen',
                       icon: Icons.person,
-                      onTap: _navigateToListsTab,
+                      onTap: () {
+                        // BURADAKİ 'const' İBARESİNİ SİLDİK (Hata buydu)
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => LibraryFolderDetailScreen(
+                              folderName: "Solo Kütüphanem",
+                              filterId: 'solo',
+                            ),
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 12),
                     _buildQuickAccessCard(
@@ -284,7 +297,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-
+              // --- TAMİR BİTTİ ---
               const SizedBox(height: 40),
             ],
           ),
