@@ -222,4 +222,17 @@ class ApiService {
       throw Exception('Bağlantı hatası: $e');
     }
   }
+  // --- PARTNER SİL ---
+  Future<bool> deletePartner(int partnerId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/delete-partner'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"partner_id": partnerId}),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
 }

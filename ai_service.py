@@ -295,5 +295,24 @@ def get_library():
     except Exception as e:
         print(f"Kutuphane Hatasi: {str(e)}")
         return jsonify({"error": str(e)}), 500
+# --- PARTNER SİLME ---
+@app.route('/delete-partner', methods=['POST'])
+def delete_partner():
+    try:
+        data = request.get_json()
+        partner_id = data.get('partner_id')
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Sadece partneri siliyoruz, veritabanı ayarların (Cascade) 
+        # düzgünse koleksiyondaki eşleşmeler de otomatik temizlenir.
+        cursor.execute("DELETE FROM partners WHERE id = %s", (partner_id,))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({"success": True, "message": "Partner silindi"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500        
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

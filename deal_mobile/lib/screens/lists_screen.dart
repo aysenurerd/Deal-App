@@ -13,6 +13,11 @@ class ListsScreen extends StatefulWidget {
 class _ListsScreenState extends State<ListsScreen> {
   late Future<List<Map<String, dynamic>>> _partnersFuture;
 
+  // --- TASARIMINDAKİ RESMİ RENKLER ---
+  final Color dealPrimary = const Color(0xFFECCB13);     // Tasarımdaki "primary"
+  final Color dealBackground = const Color(0xFF221F10);  // Tasarımdaki "background-dark"
+  final Color dealSurface = const Color(0xFF2D2A1D);     // Tasarımdaki "surface-dark"
+
   @override
   void initState() {
     super.initState();
@@ -29,51 +34,54 @@ class _ListsScreenState extends State<ListsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: dealBackground, // Arka plan düzeltildi
       appBar: AppBar(
-        title: const Text("Kütüphanelerim 📂"),
+        title: const Text("Collections", style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
+        backgroundColor: dealBackground,
+        foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
       ),
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _partnersFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: CircularProgressIndicator(color: dealPrimary));
           }
 
           final partners = snapshot.data ?? [];
 
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             children: [
               // 1. SOLO KÜTÜPHANE BUTONU
               _buildLibraryFolder(
                 context,
                 title: "Solo Kütüphanem",
-                subtitle: "Kendin için seçtiklerin",
+                subtitle: "Your private collection",
                 icon: Icons.person,
-                color: Colors.amber,
-                filterId: 'solo', // Backend'e 'solo' diyeceğiz
+                color: dealPrimary, // İkon rengi sarı
+                filterId: 'solo',
               ),
               
-              const SizedBox(height: 20),
-              const Text("Partner Koleksiyonları", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
+              const SizedBox(height: 24),
+              const Text("Partner Collections", 
+                style: TextStyle(color: Colors.white38, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.2)),
+              const SizedBox(height: 12),
 
-              // 2. PARTNER BUTONLARI (Varsa Listelenir)
               if (partners.isEmpty)
                 const Padding(
                   padding: EdgeInsets.all(8.0),
-                  child: Text("Henüz partner eklenmemiş.", style: TextStyle(color: Colors.grey)),
+                  child: Text("No partners added yet.", style: TextStyle(color: Colors.white24)),
                 )
               else
                 ...partners.map((partner) => _buildLibraryFolder(
                   context,
-                  title: "${partner['name']} ile Ortaklar",
-                  subtitle: "Eşleşen filmleriniz",
+                  title: "${partner['name']}'s Matches",
+                  subtitle: "Shared movie interest",
                   icon: Icons.favorite,
-                  color: Colors.pinkAccent,
-                  filterId: partner['id'].toString(), // Backend'e ID göndereceğiz
+                  color: Colors.redAccent,
+                  filterId: partner['id'].toString(),
                 )),
             ],
           );
@@ -84,25 +92,27 @@ class _ListsScreenState extends State<ListsScreen> {
 
   Widget _buildLibraryFolder(BuildContext context, {required String title, required String subtitle, required IconData icon, required Color color, required String filterId}) {
     return Card(
-      color: const Color(0xFF2C2C2E),
-      elevation: 4,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      color: dealSurface, // Kart rengi düzeltildi
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: Colors.white.withOpacity(0.05)),
+      ),
       child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         leading: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
+            color: color.withOpacity(0.1),
             shape: BoxShape.circle,
           ),
-          child: Icon(icon, color: color, size: 30),
+          child: Icon(icon, color: color, size: 28),
         ),
         title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-        subtitle: Text(subtitle, style: const TextStyle(color: Colors.grey)),
-        trailing: const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 16),
+        subtitle: Text(subtitle, style: const TextStyle(color: Colors.white38, fontSize: 13)),
+        trailing: Icon(Icons.arrow_forward_ios, color: dealPrimary, size: 16),
         onTap: () {
-          // Klasöre tıklayınca Detay Ekranına git
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -121,7 +131,7 @@ class _ListsScreenState extends State<ListsScreen> {
 // --- ALT EKRAN: FİLM LİSTESİ (Izgara Görünümü) ---
 class LibraryFolderDetailScreen extends StatefulWidget {
   final String folderName;
-  final String filterId; // 'solo' veya partner ID'si
+  final String filterId;
 
   const LibraryFolderDetailScreen({super.key, required this.folderName, required this.filterId});
 
@@ -131,13 +141,15 @@ class LibraryFolderDetailScreen extends StatefulWidget {
 
 class _LibraryFolderDetailScreenState extends State<LibraryFolderDetailScreen> {
   late Future<List<dynamic>> _moviesFuture;
+  final Color dealPrimary = const Color(0xFFECCB13);
+  final Color dealBackground = const Color(0xFF221F10);
+  final Color dealSurface = const Color(0xFF2D2A1D);
 
   @override
   void initState() {
     super.initState();
     final userId = UserSession().userId;
     if (userId != null) {
-      // Filtreli istek atıyoruz
       _moviesFuture = ApiService().fetchLibrary(userId, partnerId: widget.filterId);
     }
   }
@@ -145,24 +157,26 @@ class _LibraryFolderDetailScreenState extends State<LibraryFolderDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: dealBackground, // Alt ekran arka planı düzeltildi
       appBar: AppBar(
         title: Text(widget.folderName),
-        backgroundColor: const Color(0xFF1C1C1E),
+        backgroundColor: dealBackground,
         foregroundColor: Colors.white,
+        elevation: 0,
       ),
       body: FutureBuilder<List<dynamic>>(
         future: _moviesFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: CircularProgressIndicator(color: dealPrimary));
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.movie_outlined, size: 80, color: Colors.grey[800]),
+                  Icon(Icons.movie_outlined, size: 80, color: Colors.white10),
                   const SizedBox(height: 16),
-                  const Text("Bu klasör henüz boş!", style: TextStyle(color: Colors.grey)),
+                  const Text("This folder is empty!", style: TextStyle(color: Colors.white38)),
                 ],
               ),
             );
@@ -171,12 +185,12 @@ class _LibraryFolderDetailScreenState extends State<LibraryFolderDetailScreen> {
           final movies = snapshot.data!;
 
           return GridView.builder(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
               childAspectRatio: 0.65,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
             ),
             itemCount: movies.length,
             itemBuilder: (context, index) {
@@ -184,30 +198,30 @@ class _LibraryFolderDetailScreenState extends State<LibraryFolderDetailScreen> {
               return GestureDetector(
                 onTap: () => _showFullMovieDetails(context, movie),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(16),
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
                       Image.network(
                         movie['poster_url'] ?? '',
                         fit: BoxFit.cover,
-                        errorBuilder: (ctx, err, stack) => Container(color: Colors.grey),
+                        errorBuilder: (ctx, err, stack) => Container(color: dealSurface),
                       ),
-                      // Üstüne Puan Etiketi
                       Positioned(
-                        top: 5,
-                        right: 5,
+                        top: 6,
+                        right: 6,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.7),
-                            borderRadius: BorderRadius.circular(5),
+                            color: Colors.black.withOpacity(0.8),
+                            borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.star, color: Colors.amber, size: 12),
-                              const SizedBox(width: 4),
-                              Text("${movie['vote_average']}", style: const TextStyle(color: Colors.white, fontSize: 12)),
+                              Icon(Icons.star, color: dealPrimary, size: 10),
+                              const SizedBox(width: 3),
+                              Text("${movie['vote_average']}", 
+                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
                             ],
                           ),
                         ),
@@ -223,86 +237,78 @@ class _LibraryFolderDetailScreenState extends State<LibraryFolderDetailScreen> {
     );
   }
 
-  // --- DETAY PENCERESİ (GELİŞMİŞ) ---
   void _showFullMovieDetails(BuildContext context, Map<String, dynamic> movie) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF2C2C2E),
-      isScrollControlled: true, // Tam ekran olabilsin diye
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      backgroundColor: dealSurface, // Detay paneli rengi düzeltildi
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.6, // Ekranın %60'ı kadar açılsın
-        minChildSize: 0.4,
-        maxChildSize: 0.9,
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
         expand: false,
         builder: (_, controller) => SingleChildScrollView(
           controller: controller,
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Başlık ve Kapatma Çubuğu
               Center(
                 child: Container(
-                  width: 40, height: 4,
-                  decoration: BoxDecoration(color: Colors.grey, borderRadius: BorderRadius.circular(2)),
+                  width: 48, height: 5,
+                  decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(10)),
                 ),
               ),
-              const SizedBox(height: 20),
-              
-              // 2. Afiş ve Yan Bilgiler
+              const SizedBox(height: 24),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.network(movie['poster_url'] ?? '', width: 100, height: 150, fit: BoxFit.cover),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.network(movie['poster_url'] ?? '', width: 110, height: 160, fit: BoxFit.cover),
                   ),
-                  const SizedBox(width: 15),
+                  const SizedBox(width: 20),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          movie['title'] ?? 'İsimsiz',
-                          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                          movie['title'] ?? 'Unknown',
+                          style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 12),
                         Row(
                           children: [
-                            const Icon(Icons.star, color: Colors.amber, size: 20),
-                            const SizedBox(width: 5),
-                            Text("${movie['vote_average']} / 10", style: const TextStyle(color: Colors.grey, fontSize: 16)),
+                            Icon(Icons.star, color: dealPrimary, size: 20),
+                            const SizedBox(width: 6),
+                            Text("${movie['vote_average']} / 10", 
+                              style: const TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w600)),
                           ],
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 16),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.green),
+                            color: dealPrimary.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: dealPrimary.withOpacity(0.5)),
                           ),
-                          child: const Text("MATCHED! ✅", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                          child: Text("MATCHED ✅", 
+                            style: TextStyle(color: dealPrimary, fontWeight: FontWeight.bold, fontSize: 12)),
                         ),
                       ],
                     ),
                   ),
                 ],
               ),
-              
-              const SizedBox(height: 25),
-              const Divider(color: Colors.grey),
-              const SizedBox(height: 15),
-
-              // 3. Özet (Overview) - ARTIK BURASI DOLU GELECEK
-              const Text("Özet", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
+              const SizedBox(height: 32),
+              const Text("Overview", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
               Text(
-                movie['overview'] ?? "Detay yok.",
-                style: const TextStyle(color: Colors.grey, fontSize: 15, height: 1.5),
+                movie['overview'] ?? "No description available.",
+                style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 15, height: 1.6),
               ),
-              
               const SizedBox(height: 40),
             ],
           ),
