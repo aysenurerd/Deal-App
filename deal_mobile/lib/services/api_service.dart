@@ -1,10 +1,9 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart'; // RangeValues için gerekli
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  // DİKKAT: Emulator kullanıyorsan 10.0.2.2, Gerçek cihazsa bilgisayarın IP'si (örn: 192.168.1.35)
-  // iOS Simulator ise localhost
+  // Emulator kullanıyorsan 10.0.2.2, Gerçek cihazsa bilgisayarın IP'si
   final String baseUrl = "http://10.0.2.2:5000"; 
 
   // 0. GİRİŞ YAP
@@ -32,7 +31,6 @@ class ApiService {
   }
 
   // 1. RASTGELE FİLM GETİR (Açılışta çalışan fonksiyon)
-  // Artık bu arkadaş da alttaki 'fetchFilteredMovie'yi kullanıyor ama filtresiz çağırıyor.
   Future<Map<String, dynamic>?> fetchRandomMovie() async {
     return fetchFilteredMovie(platform: null, genre: null);
   }
@@ -159,21 +157,20 @@ class ApiService {
     }
   }
 
-  // 5. FİLTRELİ FİLM GETİR (Yeni Yıldızımız)
-  // Python'daki '/get-filtered-movie' adresine gidiyor.
+  // 5. FİLTRELİ FİLM GETİR
   Future<Map<String, dynamic>?> fetchFilteredMovie({String? platform, String? genre}) async {
     try {
-      final url = Uri.parse('$baseUrl/get-filtered-movie'); // İŞTE EŞLEŞME BURADA SAĞLANIYOR
+      final url = Uri.parse('$baseUrl/get-filtered-movie');
       
-      print("İstek atılıyor: $url -> Platform: $platform, Tür: $genre"); // Log ekledik
+      print("İstek atılıyor: $url -> Platform: $platform, Tür: $genre");
 
       final response = await http.post(
         url,
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
-          "platform": platform, // Seçilen platform (örn: 'Netflix')
-          "genre": genre,       // Seçilen tür (örn: 'Dram')
-          "seen_ids": []        // Daha önce izlenenler (şimdilik boş)
+          "platform": platform,
+          "genre": genre,
+          "seen_ids": []
         }),
       );
 
@@ -187,6 +184,36 @@ class ApiService {
     } catch (e) {
       print("❌ Bağlantı Hatası: $e");
       return null;
+    }
+  }
+
+  // --- 6. PROFİL GETİR (Düzeltildi: static silindi) ---
+  Future<Map<String, dynamic>> fetchProfile(int userId) async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/get-profile?user_id=$userId'));
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Profil yüklenemedi: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Bağlantı hatası: $e');
+    }
+  }
+
+  // --- 7. KÜTÜPHANE GETİR (Düzeltildi: static silindi) ---
+  Future<List<dynamic>> fetchLibrary(int userId) async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/get-library?user_id=$userId'));
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Kütüphane yüklenemedi: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Bağlantı hatası: $e');
     }
   }
 }
