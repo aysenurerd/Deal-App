@@ -202,10 +202,16 @@ class ApiService {
     }
   }
 
-  // --- 7. KÜTÜPHANE GETİR (Düzeltildi: static silindi) ---
-  Future<List<dynamic>> fetchLibrary(int userId) async {
+// --- KÜTÜPHANE GETİR (Güncellendi: Partner ID desteği) ---
+  Future<List<dynamic>> fetchLibrary(int userId, {String? partnerId}) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/get-library?user_id=$userId'));
+      // Eğer partnerId varsa URL'e ekle (Örn: &partner_id=5 veya &partner_id=solo)
+      String urlStr = '$baseUrl/get-library?user_id=$userId';
+      if (partnerId != null) {
+        urlStr += '&partner_id=$partnerId';
+      }
+
+      final response = await http.get(Uri.parse(urlStr));
 
       if (response.statusCode == 200) {
         return json.decode(response.body);

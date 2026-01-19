@@ -214,28 +214,86 @@ def save_match():
         return jsonify({"success": True})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
-# --- 5. KÜTÜPHANE LİSTELEME ---
+# --- 6. PROFİL BİLGİLERİ (GÜNCEL VERSİYON) ---
+@app.route('/get-profile', methods=['GET'])
+def get_profile():
+    try:
+        user_id = request.args.get('user_id')
+        if not user_id:
+            return jsonify({"error": "User ID gerekli"}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        
+        # Kullanıcı Adı
+        cursor.execute("SELECT username FROM users WHERE id = %s", (user_id,))
+        user = cursor.fetchone()
+        
+        # Partner Adı (İlk partneri örnek alalım)
+        cursor.execute("SELECT name FROM partners WHERE user_id = %s LIMIT 1", (user_id,))
+        partner = cursor.fetchone()
+        
+        # Toplam Beğeni Sayısı
+        cursor.execute("SELECT COUNT(*) as count FROM collections WHERE user_id = %s", (user_id,))
+        stats = cursor.fetchone()
+        
+        conn.close()
+        
+        return jsonify({
+            "username": user['username'] if user else "Bilinmiyor",
+            "partner_name": partner['name'] if partner else "Partner Yok",
+            "total_likes": stats['count'] if stats else 0
+        })
+
+    except Exception as e:
+        print(f"Profil Hatasi: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+# --- 7. KÜTÜPHANE (TEK VE KLASÖR DESTEKLİ VERSİYON) ---
 @app.route('/get-library', methods=['GET'])
 def get_library():
     try:
         user_id = request.args.get('user_id')
+        partner_id = request.args.get('partner_id') # Flutter'dan gelen filtre
+        
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
+        
+        # Detaylı sorgu: Overview (Özet) bilgisini de çekiyoruz
         query = """
-            SELECT m.id, m.title, m.poster_url, m.vote_average, c.saved_at
+            SELECT m.id, m.title, m.poster_url, m.vote_average, m.overview, c.saved_at
             FROM collections c
             JOIN movies m ON c.movie_id = m.id
-            WHERE c.user_id = %s AND c.partner_id IS NULL
-            ORDER BY c.saved_at DESC
+            WHERE c.user_id = %s
         """
-        cursor.execute(query, (user_id,))
-        movies = cursor.fetchall()
-        for m in movies:
-            if m['poster_url'] and not m['poster_url'].startswith('http'):
-                m['poster_url'] = f"https://image.tmdb.org/t/p/w500{m['poster_url']}"
-        conn.close()
-        return jsonify(movies)
-    except Exception as e: return jsonify({"error": str(e)}), 500
+        params = [user_id]
 
+        # Filtreleme mantığı
+        if partner_id == 'solo':
+            query += " AND c.partner_id IS NULL"
+        elif partner_id and partner_id != 'null':
+            query += " AND c.partner_id = %s"
+            params.append(partner_id)
+        
+        query += " ORDER BY c.saved_at DESC"
+        
+        cursor.execute(query, tuple(params))
+        movies = cursor.fetchall()
+        
+        for m in movies:
+            if m.get('poster_url') and not m['poster_url'].startswith('http'):
+                m['poster_url'] = f"https://image.tmdb.org/t/p/w500{m['poster_url']}"
+            if not m.get('overview'):
+                m['overview'] = "Bu film için özet bilgisi bulunamadı."
+                
+        conn.close()
+        response = jsonify(movies)
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return response
+
+    except Exception as e:
+        print(f"Kutuphane Hatasi: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
